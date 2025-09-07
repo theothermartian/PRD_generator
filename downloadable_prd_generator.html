@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRD Generator</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const PRDGenerator = () => {
+          // State management
+          const [theme, setTheme] = useState('light');
+          const [config, setConfig] = useState({
+            tech: 'react',
+            hosting: 'public',
+            output: 'markdown'
+          });
+          const [questions, setQuestions] = useState({
+            question1: '',
+            question2: '',
+            question3: ''
+          });
+          const [isGenerating, setIsGenerating] = useState(false);
+          const [progress, setProgress] = useState(0);
+          const [progressText, setProgressText] = useState('');
+          const [generatedPRD, setGeneratedPRD] = useState('');
+          const [showOutput, setShowOutput] = useState(false);
+
+          // Load theme from localStorage
+          useEffect(() => {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            setTheme(savedTheme);
+          }, []);
+
+          // Theme toggle
+          const toggleTheme = () => {
+            const newTheme = theme === 'light' ? 'dark' : 'light';
+            setTheme(newTheme);
+            localStorage.setItem('theme', newTheme);
+          };
+
+          // Configuration handler
+          const handleConfigChange = (group, value) => {
+            setConfig(prev => ({ ...prev, [group]: value }));
+          };
+
+          // Question handler
+          const handleQuestionChange = (questionId, value) => {
+            if (value.length <= 1000) {
+              setQuestions(prev => ({ ...prev, [questionId]: value }));
+            }
+          };
+
+          // Simulate progress steps
+          const updateProgress = async (step, text) => {
+            setProgress(step);
+            setProgressText(text);
+            await new Promise(resolve => setTimeout(resolve, 1500));
+          };
+
+          // Generate PRD using Claude API
+          const generatePRD = async () => {
+            const { question1, question2, question3 } = questions;
+            
+            if (!question1.trim() || !question2.trim() || !question3.trim()) {
+              alert('Please answer all three questions before generating the PRD.');
+              return;
+            }
+
+            setIsGenerating(true);
+            setShowOutput(false);
+            setProgress(0);
+
+            try {
+              // Step 1: Initial PRD Generation
+              await updateProgress(20, 'Analyzing your requirements...');
+              
+              const initialPrompt = `You are an expert product manager. Generate a comprehensive PRD (Product Requirements Document) based on the following user inputs. 
+
+Follow this EXACT template structure:
+
+# One-pager: [Product Name]
+
+## 1. TL;DR: A short summary—what is this, who's it for, and why does it matter?
+
+## 2. Goals: Business goals, user goals, non-goals
+
+## 3. User stories: Personas and their jobs-to-be-done
+
+## 4. Functional requirements: Grouped features by priority
+
+## 5. User experience: Bullet-pointed user journeys
+
+## 6. Narrative: A day-in-the-life
+
+## 7. Success metrics
+
+## 8. Milestones & sequencing: Lean roadmap, phases
+
+USER INPUTS:
+1. Problem and target users: ${question1}
+2. Solution requirements: ${question2}  
+3. Success metrics: ${question3}
+
+IMPORTANT GUIDELINES:
+- Only use information explicitly provided by the user
+- Do not invent specific user demographics, technical details, or market data not mentioned
+- Extrapolate logically from the given information
+- Make the PRD detailed and comprehensive
+- Use markdown formatting
+- Focus on core components, why they are used, and how they are used
+- If user input lacks detail in any area, acknowledge what additional information would strengthen that section
+
+Generate a complete, professional PRD following the template above.`;
+
+              await updateProgress(40, 'Generating initial PRD structure...');
+
+              const initialResponse = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: "claude-sonnet-4-20250514",
+                  max_tokens: 4000,
+                  messages: [
+                    { role: "user", content: initialPrompt }
+                  ]
+                })
+              });
+
+              const initialData = await initialResponse.json();
+              const initialPRD = initialData.content[0].text;
+
+              await updateProgress(60, 'Creating detailed sections...');
+
+              // Step 2: Improvement in fresh context
+              await updateProgress(80, 'Reviewing and improving content...');
+
+              const improvementPrompt = `You are a senior product management consultant reviewing a PRD. Please analyze the following PRD and suggest improvements. Then provide the final, improved version.
+
+Original PRD:
+${initialPRD}
+
+Please:
+1. Identify areas that could be more detailed or clearer
+2. Check for any logical inconsistencies
+3. Ensure all sections are comprehensive and actionable
+4. Verify that the PRD follows best practices
+5. Provide the final improved PRD
+
+Focus on making it more actionable, specific, and professional while maintaining the original structure and user requirements.
+
+Provide your response in this format:
+## IMPROVEMENTS IDENTIFIED:
+[List specific improvements made]
+
+## FINAL PRD:
+[Complete improved PRD in markdown format]`;
+
+              const improvementResponse = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: "claude-sonnet-4-20250514",
+                  max_tokens: 4000,
+                  messages: [
+                    { role: "user", content: improvementPrompt }
+                  ]
+                })
+              });
+
+              const improvementData = await improvementResponse.json();
+              const finalContent = improvementData.content[0].text;
+
+              await updateProgress(100, 'Finalizing your PRD...');
+
+              // Extract the final PRD from the response
+              const finalPRDMatch = finalContent.match(/## FINAL PRD:([\s\S]*)/);
+              const finalPRD = finalPRDMatch ? finalPRDMatch[1].trim() : finalContent;
+
+              setGeneratedPRD(finalPRD);
+              setShowOutput(true);
+
+            } catch (error) {
+              console.error('Error generating PRD:', error);
+              alert('Error generating PRD. Please try again.');
+            } finally {
+              setIsGenerating(false);
+              setProgress(0);
+            }
+          };
+
+          // Copy to clipboard
+          const copyToClipboard = async () => {
+            try {
+              await navigator.clipboard.writeText(generatedPRD);
+              alert('PRD copied to clipboard!');
+            } catch (error) {
+              console.error('Failed to copy:', error);
+              alert('Failed to copy. Please select and copy manually.');
+            }
+          };
+
+          // Download PRD
+          const downloadPRD = () => {
+            const blob = new Blob([generatedPRD], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'generated-prd.md';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          };
+
+          // Reset form
+          const resetForm = () => {
+            setQuestions({ question1: '', question2: '', question3: '' });
+            setGeneratedPRD('');
+            setShowOutput(false);
+          };
+
+          return (
+            <div className={`min-h-screen transition-all duration-300 ${
+              theme === 'dark' 
+                ? 'bg-slate-900 text-slate-100' 
+                : 'bg-gray-50 text-gray-900'
+            }`}>
+              {/* Header */}
+              <header className={`border-b shadow-sm ${
+                theme === 'dark' 
+                  ? 'bg-slate-800 border-slate-700' 
+                  : 'bg-white border-gray-200'
+              }`}>
+                <div className="max-w-6xl mx-auto px-5 py-4">
+                  <div className="flex justify-between items-center flex-wrap gap-4">
+                    <h1 className={`text-2xl font-bold ${
+                      theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                    }`}>PRD Generator</h1>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-sm font-medium ${
+                        theme === 'dark' ? 'text-slate-300' : 'text-gray-600'
+                      }`}>🌞 Light</span>
+                      <button
+                        onClick={toggleTheme}
+                        className={`relative w-12 h-6 rounded-full transition-all duration-300`}
+                        style={{
+                          backgroundColor: theme === 'dark' ? '#3b82f6' : '#d1d5db'
+                        }}
+                      >
+                        <div
+                          className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${
+                            theme === 'dark' ? 'translate-x-6' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                      <span className={`text-sm font-medium ${
+                        theme === 'dark' ? 'text-slate-300' : 'text-gray-600'
+                      }`}>🌙 Dark</span>
+                    </div>
+                  </div>
+                </div>
+              </header>
+
+              {/* Configuration Panel */}
+              <section className={`border-b py-6 ${
+                theme === 'dark' 
+                  ? 'bg-slate-800 border-slate-700' 
+                  : 'bg-gray-100 border-gray-200'
+              }`}>
+                <div className="max-w-6xl mx-auto px-5">
+                  <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
+                    {/* Technology Stack */}
+                    <div className="flex items-center gap-4">
+                      <span className={`text-base font-semibold whitespace-nowrap ${
+                        theme === 'dark' ? 'text-slate-200' : 'text-gray-800'
+                      }`}>Tech:</span>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-base font-medium transition-colors duration-200 ${
+                          config.tech === 'react' 
+                            ? (theme === 'dark' ? 'text-blue-400' : 'text-blue-600')
+                            : (theme === 'dark' ? 'text-slate-400' : 'text-gray-500')
+                        }`}>React</span>
+                        <button
+                          onClick={() => handleConfigChange('tech', config.tech === 'react' ? 'python' : 'react')}
+                          className={`relative w-14 h-7 rounded-full transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50`}
+                          style={{
+                            backgroundColor: config.tech === 'python' ? '#3b82f6' : '#d1d5db'
+                          }}
+                        >
+                          <div
+                            className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${
+                              config.tech === 'python' ? 'translate-x-7' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                        <span className={`text-base font-medium transition-colors duration-200 ${
+                          config.tech === 'python' 
+                            ? (theme === 'dark' ? 'text-blue-400' : 'text-blue-600')
+                            : (theme === 'dark' ? 'text-slate-400' : 'text-gray-500')
+                        }`}>Python</span>
+                      </div>
+                    </div>
+
+                    {/* Hosting Preference */}
+                    <div className="flex items-center gap-4">
+                      <span className={`text-base font-semibold whitespace-nowrap ${
+                        theme === 'dark' ? 'text-slate-200' : 'text-gray-800'
+                      }`}>Hosting:</span>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-base font-medium transition-colors duration-200 ${
+                          config.hosting === 'public' 
+                            ? (theme === 'dark' ? 'text-blue-400' : 'text-blue-600')
+                            : (theme === 'dark' ? 'text-slate-400' : 'text-gray-500')
+                        }`}>Public</span>
+                        <button
+                          onClick={() => handleConfigChange('hosting', config.hosting === 'public' ? 'internal' : 'public')}
+                          className={`relative w-14 h-7 rounded-full transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50`}
+                          style={{
+                            backgroundColor: config.hosting === 'internal' ? '#3b82f6' : '#d1d5db'
+                          }}
+                        >
+                          <div
+                            className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${
+                              config.hosting === 'internal' ? 'translate-x-7' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                        <span className={`text-base font-medium transition-colors duration-200 ${
+                          config.hosting === 'internal' 
+                            ? (theme === 'dark' ? 'text-blue-400' : 'text-blue-600')
+                            : (theme === 'dark' ? 'text-slate-400' : 'text-gray-500')
+                        }`}>Internal</span>
+                      </div>
+                    </div>
+
+                    {/* Output Format */}
+                    <div className="flex items-center gap-4">
+                      <span className={`text-base font-semibold whitespace-nowrap ${
+                        theme === 'dark' ? 'text-slate-200' : 'text-gray-800'
+                      }`}>Output:</span>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-base font-medium transition-colors duration-200 ${
+                          config.output === 'markdown' 
+                            ? (theme === 'dark' ? 'text-blue-400' : 'text-blue-600')
+                            : (theme === 'dark' ? 'text-slate-400' : 'text-gray-500')
+                        }`}>Markdown</span>
+                        <button
+                          onClick={() => handleConfigChange('output', config.output === 'markdown' ? 'pdf' : 'markdown')}
+                          className={`relative w-14 h-7 rounded-full transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50`}
+                          style={{
+                            backgroundColor: config.output === 'pdf' ? '#3b82f6' : '#d1d5db'
+                          }}
+                        >
+                          <div
+                            className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${
+                              config.output === 'pdf' ? 'translate-x-7' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                        <span className={`text-base font-medium transition-colors duration-200 ${
+                          config.output === 'pdf' 
+                            ? (theme === 'dark' ? 'text-blue-400' : 'text-blue-600')
+                            : (theme === 'dark' ? 'text-slate-400' : 'text-gray-500')
+                        }`}>PDF</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Main Content */}
+              <main className="py-12">
+                <div className="max-w-4xl mx-auto px-5">
+                  {/* Intro */}
+                  <div className="text-center mb-12">
+                    <h1 className={`text-4xl md:text-5xl font-bold mb-4 ${
+                      theme === 'dark' ? 'text-slate-100' : 'text-gray-900'
+                    }`}>
+                      Create Your PRD in Minutes
+                    </h1>
+                    <p className={`text-lg max-w-2xl mx-auto ${
+                      theme === 'dark' ? 'text-slate-300' : 'text-gray-600'
+                    }`}>
+                      Answer three simple questions and let Claude generate a comprehensive Product Requirements Document tailored to your project.
+                    </p>
+                  </div>
+
+                  {/* Form Section */}
+                  <div className={`rounded-2xl border shadow-lg p-8 mb-8 ${
+                    theme === 'dark' 
+                      ? 'bg-slate-800 border-slate-700' 
+                      : 'bg-white border-gray-200'
+                  }`}>
+                    <div className="space-y-8">
+                      {/* Question 1 */}
+                      <div className={`p-6 rounded-xl border ${
+                        theme === 'dark' 
+                          ? 'bg-slate-700 border-slate-600' 
+                          : 'bg-gray-50 border-gray-200'
+                      }`}>
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold">
+                            1
+                          </div>
+                          <h3 className={`text-xl font-semibold ${
+                            theme === 'dark' ? 'text-slate-100' : 'text-gray-900'
+                          }`}>
+                            What problem are you solving and for whom?
+                          </h3>
+                        </div>
+                        <p className={`italic mb-4 ${
+                          theme === 'dark' ? 'text-slate-400' : 'text-gray-500'
+                        }`}>
+                          Be specific about the user pain point, who experiences it, and when/why it occurs.
+                        </p>
+                        <textarea
+                          value={questions.question1}
+                          onChange={(e) => handleQuestionChange('question1', e.target.value)}
+                          placeholder="Example: Small business owners struggle to track customer interactions across multiple touchpoints (email, phone, social media) because they use disparate tools that don't integrate. This leads to missed follow-ups and poor customer experience, especially during busy seasons when they handle 50+ customer interactions per day..."
+                          className={`w-full h-32 p-4 border-2 rounded-lg resize-y focus:outline-none focus:border-blue-500 transition-colors ${
+                            theme === 'dark' 
+                              ? 'bg-slate-800 border-slate-600 text-slate-100' 
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
+                          maxLength={1000}
+                        />
+                        <div className={`text-right text-sm mt-2 ${
+                          theme === 'dark' ? 'text-slate-400' : 'text-gray-500'
+                        }`}>
+                          {questions.question1.length}/1000 characters
+                        </div>
+                      </div>
+
+                      {/* Question 2 */}
+                      <div className={`p-6 rounded-xl border ${
+                        theme === 'dark' 
+                          ? 'bg-slate-700 border-slate-600' 
+                          : 'bg-gray-50 border-gray-200'
+                      }`}>
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold">
+                            2
+                          </div>
+                          <h3 className={`text-xl font-semibold ${
+                            theme === 'dark' ? 'text-slate-100' : 'text-gray-900'
+                          }`}>
+                            What does the solution need to accomplish?
+                          </h3>
+                        </div>
+                        <p className={`italic mb-4 ${
+                          theme === 'dark' ? 'text-slate-400' : 'text-gray-500'
+                        }`}>
+                          Describe the core functionality and user experience required to solve this problem.
+                        </p>
+                        <textarea
+                          value={questions.question2}
+                          onChange={(e) => handleQuestionChange('question2', e.target.value)}
+                          placeholder="Example: The solution should centralize all customer communications in one dashboard, automatically log interactions from email/phone/social media, send automated follow-up reminders, and provide a mobile app for on-the-go access. Users should be able to see a complete customer history in under 3 clicks and set up automated workflows without technical knowledge..."
+                          className={`w-full h-32 p-4 border-2 rounded-lg resize-y focus:outline-none focus:border-blue-500 transition-colors ${
+                            theme === 'dark' 
+                              ? 'bg-slate-800 border-slate-600 text-slate-100' 
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
+                          maxLength={1000}
+                        />
+                        <div className={`text-right text-sm mt-2 ${
+                          theme === 'dark' ? 'text-slate-400' : 'text-gray-500'
+                        }`}>
+                          {questions.question2.length}/1000 characters
+                        </div>
+                      </div>
+
+                      {/* Question 3 */}
+                      <div className={`p-6 rounded-xl border ${
+                        theme === 'dark' 
+                          ? 'bg-slate-700 border-slate-600' 
+                          : 'bg-gray-50 border-gray-200'
+                      }`}>
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold">
+                            3
+                          </div>
+                          <h3 className={`text-xl font-semibold ${
+                            theme === 'dark' ? 'text-slate-100' : 'text-gray-900'
+                          }`}>
+                            {prdConfig?.questions.question3.title || 'How will you measure success?'}
+                          </h3>
+                        </div>
+                        <p className={`italic mb-4 ${
+                          theme === 'dark' ? 'text-slate-400' : 'text-gray-500'
+                        }`}>
+                          {prdConfig?.questions.question3.description || 'Define both user success (how they\'ll know it works) and business success (metrics/goals).'}
+                        </p>
+                        <textarea
+                          value={questions.question3}
+                          onChange={(e) => handleQuestionChange('question3', e.target.value)}
+                          placeholder={prdConfig?.questions.question3.placeholder || "Define success metrics..."}
+                          className={`w-full h-32 p-4 border-2 rounded-lg resize-y focus:outline-none focus:border-blue-500 transition-colors ${
+                            theme === 'dark' 
+                              ? 'bg-slate-800 border-slate-600 text-slate-100' 
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
+                          maxLength={prdConfig?.questions.question3.maxLength || 1000}
+                        />
+                        <div className={`text-right text-sm mt-2 ${
+                          theme === 'dark' ? 'text-slate-400' : 'text-gray-500'
+                        }`}>
+                          {questions.question3.length}/{prdConfig?.questions.question3.maxLength || 1000} characters
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Generate Button */}
+                    <div className="text-center mt-8">
+                      <button
+                        onClick={generatePRD}
+                        disabled={isGenerating || !questions.question1.trim() || !questions.question2.trim() || !questions.question3.trim()}
+                        className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:from-gray-400 disabled:to-gray-500"
+                      >
+                        {isGenerating ? 'Generating...' : 'Generate PRD'}
+                      </button>
+                    </div>
+
+                    {/* Progress Section */}
+                    {isGenerating && (
+                      <div className="mt-8">
+                        <div className={`w-full rounded-full h-2 overflow-hidden ${
+                          theme === 'dark' ? 'bg-slate-700' : 'bg-gray-200'
+                        }`}>
+                          <div
+                            className="h-full bg-gradient-to-r from-blue-600 to-blue-700 transition-all duration-500"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <div className={`text-center mt-4 ${
+                          theme === 'dark' ? 'text-slate-300' : 'text-gray-600'
+                        }`}>
+                          {progressText}
+                          <span className="inline-block animate-pulse">...</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Output Section */}
+                  {showOutput && (
+                    <div className={`rounded-2xl border shadow-lg p-8 ${
+                      theme === 'dark' 
+                        ? 'bg-slate-800 border-slate-700' 
+                        : 'bg-white border-gray-200'
+                    }`}>
+                      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+                        <h2 className={`text-2xl font-semibold ${
+                          theme === 'dark' ? 'text-slate-100' : 'text-gray-900'
+                        }`}>Generated PRD</h2>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={copyToClipboard}
+                            className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-colors"
+                          >
+                            Copy Markdown
+                          </button>
+                          <button
+                            onClick={downloadPRD}
+                            className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-colors"
+                          >
+                            Download
+                          </button>
+                          <button
+                            onClick={resetForm}
+                            className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-colors"
+                          >
+                            New PRD
+                          </button>
+                        </div>
+                      </div>
+                      <div className={`border rounded-xl p-6 max-h-96 overflow-y-auto ${
+                        theme === 'dark' 
+                          ? 'bg-slate-700 border-slate-600' 
+                          : 'bg-gray-50 border-gray-200'
+                      }`}>
+                        <pre className={`text-sm leading-relaxed whitespace-pre-wrap font-mono ${
+                          theme === 'dark' ? 'text-slate-100' : 'text-gray-900'
+                        }`}>
+                          {generatedPRD}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </main>
+            </div>
+          );
+        };
+
+        ReactDOM.render(<PRDGenerator />, document.getElementById('root'));
+    </script>
+</body>
+</html>

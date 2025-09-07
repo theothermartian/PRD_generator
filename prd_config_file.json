@@ -1,0 +1,73 @@
+{
+  "prompts": {
+    "initial": {
+      "description": "This prompt generates the first draft of the PRD based on user inputs. It creates a comprehensive document following the 8-section template structure.",
+      "template": "You are an expert product manager. Generate a comprehensive PRD (Product Requirements Document) based on the following user inputs.\n\nFollow this EXACT template structure:\n\n# One-pager: [Product Name]\n\n## 1. TL;DR: A short summary—what is this, who's it for, and why does it matter?\n\n## 2. Goals: Business goals, user goals, non-goals\n\n## 3. User stories: Personas and their jobs-to-be-done\n\n## 4. Functional requirements: Grouped features by priority\n\n## 5. User experience: Bullet-pointed user journeys\n\n## 6. Narrative: A day-in-the-life\n\n## 7. Success metrics\n\n## 8. Milestones & sequencing: Lean roadmap, phases\n\nUSER INPUTS:\n1. Problem and target users: {question1}\n2. Solution requirements: {question2}\n3. Success metrics: {question3}\n\nIMPORTANT GUIDELINES:\n- Only use information explicitly provided by the user\n- Do not invent specific user demographics, technical details, or market data not mentioned\n- Extrapolate logically from the given information\n- Make the PRD detailed and comprehensive\n- Use markdown formatting\n- Focus on core components, why they are used, and how they are used\n- If user input lacks detail in any area, acknowledge what additional information would strengthen that section\n\nGenerate a complete, professional PRD following the template above."
+    },
+    "improvement": {
+      "description": "This prompt takes the initial PRD and improves it in a fresh context. It acts as a senior product management consultant reviewing and enhancing the document.",
+      "template": "You are a senior product management consultant reviewing a PRD. Please analyze the following PRD and suggest improvements. Then provide the final, improved version.\n\nOriginal PRD:\n{initialPRD}\n\nPlease:\n1. Identify areas that could be more detailed or clearer\n2. Check for any logical inconsistencies\n3. Ensure all sections are comprehensive and actionable\n4. Verify that the PRD follows best practices\n5. Provide the final improved PRD\n\nFocus on making it more actionable, specific, and professional while maintaining the original structure and user requirements.\n\nProvide your response in this format:\n## IMPROVEMENTS IDENTIFIED:\n[List specific improvements made]\n\n## FINAL PRD:\n[Complete improved PRD in markdown format]"
+    }
+  },
+  "questions": {
+    "question1": {
+      "title": "What problem are you solving and for whom?",
+      "description": "Be specific about the user pain point, who experiences it, and when/why it occurs.",
+      "placeholder": "Example: Small business owners struggle to track customer interactions across multiple touchpoints (email, phone, social media) because they use disparate tools that don't integrate. This leads to missed follow-ups and poor customer experience, especially during busy seasons when they handle 50+ customer interactions per day...",
+      "maxLength": 1000,
+      "purpose": "Captures the core problem statement, target user identification, and context. This becomes the foundation for the entire PRD."
+    },
+    "question2": {
+      "title": "What does the solution need to accomplish?",
+      "description": "Describe the core functionality and user experience required to solve this problem.",
+      "placeholder": "Example: The solution should centralize all customer communications in one dashboard, automatically log interactions from email/phone/social media, send automated follow-up reminders, and provide a mobile app for on-the-go access. Users should be able to see a complete customer history in under 3 clicks and set up automated workflows without technical knowledge...",
+      "maxLength": 1000,
+      "purpose": "Defines functional requirements, user experience expectations, and core capabilities. This drives the 'Functional Requirements' and 'User Experience' sections of the PRD."
+    },
+    "question3": {
+      "title": "How will you measure success?",
+      "description": "Define both user success (how they'll know it works) and business success (metrics/goals).",
+      "placeholder": "Example: User success: 90% reduction in missed follow-ups, 50% faster response time to customer inquiries, 95% user adoption within first month. Business success: 25% increase in customer retention, 40% improvement in customer satisfaction scores, break-even within 12 months with 500+ active users paying $50/month...",
+      "maxLength": 1000,
+      "purpose": "Establishes success criteria, KPIs, and business objectives. This populates the 'Goals' and 'Success Metrics' sections and helps define realistic milestones."
+    }
+  },
+  "progressSteps": {
+    "step1": {
+      "progress": 20,
+      "text": "Analyzing your requirements..."
+    },
+    "step2": {
+      "progress": 40,
+      "text": "Generating initial PRD structure..."
+    },
+    "step3": {
+      "progress": 60,
+      "text": "Creating detailed sections..."
+    },
+    "step4": {
+      "progress": 80,
+      "text": "Reviewing and improving content..."
+    },
+    "step5": {
+      "progress": 100,
+      "text": "Finalizing your PRD..."
+    }
+  },
+  "apiConfig": {
+    "model": "claude-sonnet-4-20250514",
+    "maxTokens": 4000,
+    "endpoint": "https://api.anthropic.com/v1/messages"
+  },
+  "documentation": {
+    "overview": "This configuration file controls the PRD generation process through a two-step approach:",
+    "step1": "Initial Generation - Uses the 'initial' prompt template to create a comprehensive PRD based on the three user questions",
+    "step2": "Fresh Context Improvement - Uses the 'improvement' prompt template in a separate API call to review and enhance the PRD",
+    "questionMapping": {
+      "question1": "Maps to PRD sections: TL;DR, User Stories, Narrative",
+      "question2": "Maps to PRD sections: Functional Requirements, User Experience, Milestones",
+      "question3": "Maps to PRD sections: Goals, Success Metrics"
+    },
+    "promptDesign": "Prompts are designed to only use explicitly provided information and avoid assumptions, while encouraging logical extrapolation and comprehensive detail."
+  }
+}
